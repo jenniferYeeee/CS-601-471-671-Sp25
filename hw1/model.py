@@ -67,6 +67,12 @@ def featurize(sentence: str, embeddings: gensim.models.keyedvectors.KeyedVectors
             vectors.append(embeddings[word])
         except KeyError:
             pass
+    
+    if not vectors:
+        return None
+    avg = np.mean(vectors, axis=0)
+    return torch.from_numpy(avg)
+
 
     # TODO: complete the function to compute the average embedding of the sentence
     # your return should be
@@ -79,12 +85,15 @@ def create_tensor_dataset(raw_data: Dict[str, List[Union[int, str]]],
                           embeddings: gensim.models.keyedvectors.KeyedVectors) -> TensorDataset:
     all_features, all_labels = [], []
     for text, label in tqdm(zip(raw_data['text'], raw_data['label'])):
+        
 
         # TODO: complete the for loop to featurize each sentence
         # only add the feature and label to the list if the feature is not None
+        feature = featurize(text, embeddings)
+        if feature:
+            all_features.append(feature)
+            all_labels.append(label)
         
-
-
         # your code ends here
 
     # stack all features and labels into two single tensors and create a TensorDataset
@@ -116,6 +125,7 @@ class SentimentClassifier(nn.Module):
 
         # TODO: define the linear layer
         # Hint: follow the hints in the pdf description
+        self.linear_layer = nn.Linear(embed_dim, num_classes)
         
         # your code ends here
 
@@ -124,6 +134,7 @@ class SentimentClassifier(nn.Module):
     def forward(self, inp):
         # TODO: complete the forward function
         # Hint: follow the hints in the pdf description
+        return self.linear_layer(inp)
         
         
         # your code ends here
@@ -142,6 +153,11 @@ def accuracy(logits: torch.FloatTensor, labels: torch.LongTensor) -> torch.Float
     # Hint: follow the hints in the pdf description, the return should be a tensor of 0s and 1s with the same shape as labels
     # labels is a tensor of shape (batch_size,)
     # logits is a tensor of shape (batch_size, num_classes)
+    max_ans = torch.argmax(logits, dim=1)
+    return max_ans == labels
+    
+    
+    
 
 
 def evaluate(model: SentimentClassifier, eval_dataloader: DataLoader) -> Tuple[float, float]:
