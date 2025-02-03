@@ -90,7 +90,7 @@ def create_tensor_dataset(raw_data: Dict[str, List[Union[int, str]]],
         # TODO: complete the for loop to featurize each sentence
         # only add the feature and label to the list if the feature is not None
         feature = featurize(text, embeddings)
-        if feature:
+        if feature is not None:
             all_features.append(feature)
             all_labels.append(label)
         
