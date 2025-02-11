@@ -45,9 +45,11 @@ def create_ngrams(data, n, splitter, tokenizer):
 
         # iterate over sentences given by our sentence splitter
         for sentence in splitter.split(paragraph):
+            
 
             # TODO: tokenize the words in the sentence
             # name the list of tokens as 'tokens'
+            tokens = tokenizer.tokenize(sentence)
             
             # Your code ends here
 
@@ -66,9 +68,9 @@ def create_ngrams(data, n, splitter, tokenizer):
                 #   and its occurrence count as values
                 # - 'next_word_candidates' is a dictionary with tuple of the context
                 #   (i.e. the (n-1)-grams) as keys and a set of possible next words as values
-                
-
-
+                ngrams[tuple(tokens[idx:idx + n])] += 1
+                ngram_context[tuple(tokens[idx:idx + n - 1])] += 1
+                next_word_candidates[tuple(tokens[idx:idx + n - 1])].add(tokens[idx + n - 1])
 
                 # Your code ends here
 
@@ -89,9 +91,8 @@ def create_ngrams(data, n, splitter, tokenizer):
         for nw in next_words:
             # TODO: compute the estimated probability of the next word given the context
             # hint: use the counters 'ngrams' and 'ngram_context' you have created above
-            
-
-
+            scores.append(ngrams[context + (nw,)] / ngram_context[context])
+     
             # Your code ends here
 
         # record the most probable next word as the prediction
@@ -123,6 +124,46 @@ def plot_next_word_prob(word_scores, word_candidates, context, top=10, save_path
     # - word_candidates is a dictionary with tuple of the context as keys and a list of possible next words as values (the sorted_next_word_candidates in create_ngrams function)
     # - for a given context, elements in word_scores[context] and word_candidates[context] have one-to-one correspondence
     # - context is a tuple of words
+    scores = word_scores.get(context, [])
+    candidates = word_candidates.get(context, [])
+
+    # If there's nothing to plot, just return
+    if len(scores) == 0 or len(candidates) == 0:
+        print(f"No candidates found for context {context}. Nothing to plot.")
+        return
+
+    # 1) Sort by probability in descending order
+    sorted_indices = np.argsort(scores)[::-1]  # argsort ascending, so reverse
+
+    # 2) Slice top N
+    top_indices = sorted_indices[:top]
+    top_scores = [scores[i] for i in top_indices]
+    top_words = [candidates[i] for i in top_indices]
+
+    # 3) Create a bar chart
+    plt.figure(figsize=(8, 5))
+    x_positions = np.arange(len(top_scores))
+    plt.bar(x_positions, top_scores, color='skyblue')
+    
+    # Label the bars with the actual words
+    plt.xticks(x_positions, top_words, rotation=45, ha='right')
+    
+    # Add labels and title
+    plt.xlabel('Next Word')
+    plt.ylabel('Probability')
+    plt.title(f"Top {len(top_scores)} Next-Word Probabilities\nContext: {' '.join(context)}")
+    
+    # Make layout neat
+    plt.tight_layout()
+    
+    # (Optional) Save figure
+    if save_path:
+        plt.savefig(save_path)
+        print(f"Plot saved to {save_path}")
+    
+    # Show the plot
+    plt.show()
+    
 
     # Your code ends here
 

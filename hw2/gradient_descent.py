@@ -12,6 +12,7 @@ from datasets import load_dataset
 from torch.utils.data import DataLoader, TensorDataset
 from typing import List, Tuple, Dict, Union
 from easydict import EasyDict
+import torch.nn.functional as F
 
 # set random seeds
 random.seed(42)
@@ -51,6 +52,10 @@ def featurize(sentence: str, embeddings: gensim.models.keyedvectors.KeyedVectors
             vectors.append(embeddings[word])
         except KeyError:
             pass
+    if not vectors:
+        return None
+    avg = np.mean(vectors, axis=0)
+    return torch.from_numpy(avg)
 
     # TODO (Copy from your HW1): complete the function to compute the average embedding of the sentence
     # your return should be
@@ -65,8 +70,10 @@ def create_tensor_dataset(raw_data: Dict[str, List[Union[int, str]]],
 
         # TODO (Copy from your HW1): complete the for loop to featurize each sentence
         # only add the feature and label to the list if the feature is not None
-        
-
+        feature = featurize(text, embeddings)
+        if feature is not None:
+            all_features.append(feature)
+            all_labels.append(label)
 
         # your code ends here
 
@@ -89,14 +96,14 @@ class SentimentClassifier(nn.Module):
 
         # TODO (Copy from your HW1): define the linear layer
         # Hint: follow the hints in the pdf description
-        
+        self.linear_layer = nn.Linear(embed_dim, num_classes)
         # your code ends here
 
     def forward(self, inp):
 
         # TODO (Copy from your HW1): complete the forward function
         # Hint: follow the hints in the pdf description
-        
+        return self.linear_layer(inp)
 
         # your code ends here
 
@@ -108,8 +115,12 @@ class SentimentClassifier(nn.Module):
         # Hint: follow the hints in the pdf description
         # - logits is a tensor of shape (batch_size, num_classes)
         # - return a tensor of shape (batch_size, num_classes) with the softmax of the logits
+        max_vals, _ = torch.max(logits, dim=1, keepdim=True)
+        shifted_logits = logits - max_vals  
+        exp_logits = torch.exp(shifted_logits)
+        sum_exp = torch.sum(exp_logits, dim=1, keepdim=True)
+        return exp_logits / sum_exp
         
-
 
         # your code ends here
 
@@ -123,12 +134,13 @@ class SentimentClassifier(nn.Module):
         # - grads_weights: a tensor of shape (num_classes, embed_dim) that is the gradient of linear layer's weights
         # - grads_bias: a tensor of shape (num_classes,) that is the gradient of linear layer's bias
         # - loss: a scalar that is the cross entropy loss, averaged over the batch
+        smx = self.softmax(logits)
+        labels_one_hot = F.one_hot(labels, num_classes=2).float()
         
-
-
-
-
-
+        # loss = -torch.sum(labels * torch.log(smx)).mean()
+        loss = -1 * torch.mean(torch.sum(labels_one_hot * torch.log(smx), dim = 1), dim = 0)
+        grads_weights = torch.matmul((smx - labels_one_hot).T, inp) / bsz
+        grads_bias = torch.sum(smx - labels_one_hot, dim=0) / bsz
 
         # your code ends here
 
@@ -140,6 +152,8 @@ def accuracy(logits: torch.FloatTensor , labels: torch.LongTensor) -> torch.Floa
     # Hint: follow the hints in the pdf description, the return should be a tensor of 0s and 1s with the same shape as labels
     # labels is a tensor of shape (batch_size,)
     # logits is a tensor of shape (batch_size, num_classes)
+    max_ans = torch.argmax(logits, dim=1)
+    return max_ans == labels
 
 def evaluate(model: SentimentClassifier, eval_dataloader: DataLoader) -> Tuple[float, float]:
     model.eval()
@@ -185,8 +199,8 @@ def train(model: SentimentClassifier,
             with torch.no_grad():
                 # TODO: complete the gradient descent update for the linear layer's weights and bias
                 
-
-
+                model.linear_layer.weight -= learning_rate * grads_weights
+                model.linear_layer.bias -= learning_rate * grads_bias
                 # your code ends here
 
             # record the loss and accuracy
